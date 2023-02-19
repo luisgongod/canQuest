@@ -6,74 +6,110 @@ import utime
 
 current_frame = 0
 
-rgb.setBrightness(80)
-rgb.setColorAll(0x666666)
 
 msg_ON = [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
 msg_OFF = [0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]
 msg_ACK = [0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01]
 msg_CLR = [0x10, 0x10, 0x10, 0x10, 0x10, 0x10, 0x10, 0x10]
 
+id_ON = 0x100
+id_OFF = 0x200
+id_ACK = 0x300
+id_CLR = 0x400
+
+class sm:
+    ack = 0
+    idle_on = 1
+    idle_off = 2
+    send_on = 3
+    send_off = 4
+    
+state = sm.ack
+
+WAIT_TIME_MS = 200
 
 color_ON = 0x00FF00
 color_OFF = 0xFF0000
 color_ACK = 0x0000FF
 
-toggle_send = False
-toggle_mode = False
+BRIGHTNESS = 80
 time_now = 0
 
 can = CAN(0, extframe=True, mode=CAN.NORMAL, baudrate=CAN.BAUDRATE_250K, tx_io=22, rx_io=19, auto_restart=False)
-msg_to_send = msg_ACK
-id_to_send = 0x00
 
-#working
+
 def on_wasPressed():
-    global toggle_send, toggle_mode, time_now
+    global time_now, state
     time_now = utime.ticks_ms()
     
     while btnA.isPressed():
         if utime.ticks_diff(utime.ticks_ms(), time_now) > 800:
             # Long Press:
-            toggle_send = True
-            return
+            if state==sm.idle_on:
+                state = sm.send_on
+            elif state==sm.idle_off:
+                state = sm.send_off
+            else:
+                return
         wait_ms(2)
     
     # Short Press:
-    if toggle_send:
-        toggle_send = False
-    else:
-        toggle_mode = not toggle_mode    
+    if state == sm.ack:
+        state = sm.idle_on
+    elif state == sm.idle_on:
+        state = sm.idle_off
+    elif state == sm.idle_off:
+        state = sm.idle_on
+    elif state == sm.send_on:
+        state = sm.idle_on
+    elif state == sm.send_off:
+        state = sm.idle_off
     pass
 btnA.wasPressed(on_wasPressed)
 
 
 while True:
+    if state == sm.ack:
+        rgb.setColorAll(color_ACK)
+        rgb.setBrightness(BRIGHTNESS)
+        if can.any():
+            frame = can.recv()
 
-    
-    
-    if toggle_mode:            
-        msg_to_send = msg_ON
-        id_to_send = 0x100
+            wait_ms(100)
+            rgb.setBrightness(0)
+            wait_ms(100)
+            can.clear_rx_queue()
+
+    elif state == sm.idle_on:
         rgb.setColorAll(color_ON)
-    else:            
-        msg_to_send = msg_OFF
-        id_to_send = 0x200      
+        rgb.setBrightness(BRIGHTNESS)
+    elif state == sm.idle_off:
         rgb.setColorAll(color_OFF)
-    
-    if toggle_send:
-        if toggle_mode:
-            can.send(msg_ACK, 0x300)
-            utime.sleep(0.05)
-            can.send(msg_CLR, 0x300)
-            utime.sleep(0.05)
-            
-        can.send(msg_to_send, id_to_send)
+        rgb.setBrightness(BRIGHTNESS)
+    elif state == sm.send_on:
+        rgb.setColorAll(color_ON)
+        rgb.setBrightness(BRIGHTNESS)
+        
+        can.send(msg_ACK, id_ACK)
+        wait_ms(20)
+        can.send(msg_CLR, id_CLR)
+        wait_ms(20)
+        can.send(msg_ON, id_ON)
+        
         rgb.setBrightness(0)
-        utime.sleep(0.2)
-        rgb.setBrightness(80)
-        utime.sleep(0.2)
-    else:
-        rgb.setBrightness(80)
+        wait_ms(WAIT_TIME_MS)        
+    elif state == sm.send_off:
+        rgb.setColorAll(color_OFF)
+        rgb.setBrightness(BRIGHTNESS)        
+        
+        can.send(msg_OFF, id_OFF)
+
+        wait_ms(WAIT_TIME_MS)
+        rgb.setBrightness(0)
+        wait_ms(WAIT_TIME_MS)    
+    
+
+
+
 
     wait_ms(2)
