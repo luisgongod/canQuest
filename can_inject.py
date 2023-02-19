@@ -6,16 +6,17 @@ import utime
 
 current_frame = 0
 
+from . import messages
 
-msg_ON = [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
-msg_OFF = [0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]
-msg_ACK = [0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01]
-msg_CLR = [0x10, 0x10, 0x10, 0x10, 0x10, 0x10, 0x10, 0x10]
+msg_ACK = messages.msg_ACK
+msg_CLR = messages.msg_CLR
+msg_ON  = messages.msg_ON
+msg_OFF = messages.msg_OFF
 
-id_ON = 0x100
-id_OFF = 0x200
-id_ACK = 0x300
-id_CLR = 0x400
+id_ACK = messages.id_ACK
+id_CLR = messages.id_CLR
+id_ON  = messages.id_ON
+id_OFF = messages.id_OFF
 
 class sm:
     ack = 0
@@ -98,15 +99,17 @@ while True:
         
         rgb.setBrightness(0)
         wait_ms(WAIT_TIME_MS)        
+    
+    #Turn OFF 
     elif state == sm.send_off:
         rgb.setColorAll(color_OFF)
         rgb.setBrightness(BRIGHTNESS)        
         
         can.send(msg_OFF, id_OFF)
 
-        wait_ms(WAIT_TIME_MS)
+        wait_ms(300)
         rgb.setBrightness(0)
-        wait_ms(WAIT_TIME_MS)    
+        wait_ms(300)    
     
 
 
